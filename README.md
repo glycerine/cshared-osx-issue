@@ -10,12 +10,18 @@ When I am building a c-shared dynamic library with golang code, it looks
 as though loading the shared library into the c-code masks the native signal
 handling on OSX.  
 
-This does not happen on linux. Th linux behavior seems correct,
+This does not happen on linux. The linux behavior seems correct,
 whereas on OSX the golang shared object mystifies -- the behavior below
-seems buggy. In fact I was led to investigate because when I load
+seems buggy. 
+
+I was led to investigate because when I loaded
 a c-shared built .so library into the R statistical analysis 
-environment, and then press ctrl-c: it panics/crashes on OSX, but
-works fine on Linux.
+environment, and then pressed ctrl-c: it panics/crashes on OSX, but
+works fine on Linux. See the last stack dump in this repo for the full details of that panic.
+
+This repo is an attempt to reduce/isolate that issue into a minimal test case.
+
+While I cannot reproduce the crash/panic (yet), I do observe that signal handling under OSX appears to be disabled by loading the golang based c-shared library, and I strongly suspect that this is a part of the mechanism of the crash. And it seems like a bug in its own right.
 
 on darwin-amd64 / OSX 10.10.5 Yosemite:
 
