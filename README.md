@@ -8,11 +8,7 @@ Possibly related: https://github.com/golang/go/issues/11794
 
 When I am building a c-shared dynamic library with golang code, it looks
 as though loading the shared library into the c-code masks the native signal
-handling on OSX.  
-
-This does not happen on linux. The linux behavior seems correct,
-whereas on OSX the golang shared object mystifies -- the behavior below
-seems buggy. 
+handling on OSX.  And on linux.
 
 I was led to investigate because when I loaded
 a c-shared built .so library into the R statistical analysis 
@@ -21,7 +17,9 @@ works fine on Linux. See the last stack dump in this repo for the full details o
 
 This repo is an attempt to reduce/isolate that issue into a minimal test case.
 
-While I cannot reproduce the crash/panic (yet), I do observe that signal handling under OSX appears to be disabled by loading the golang based c-shared library, and I strongly suspect that this is a part of the mechanism of the crash. And it seems like a bug in its own right.
+While I cannot reproduce the crash/panic (yet), I do observe that signal handling under OSX and linux appears to be disabled by loading the golang based c-shared library, and I strongly suspect that this is a part of the mechanism of the crash. And it seems like a bug in its own right.
+
+I think this is related to https://github.com/golang/go/issues/11794.
 
 on darwin-amd64 / OSX 10.10.5 Yosemite:
 
@@ -35,7 +33,7 @@ $ make no_go_lib   # generates ./no_mygolib
 jaten@Jasons-MacBook-Pro:~/cshared$ ./no_mygolib 
 about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
   C-c C-c
- handleInterrupt called back!
+ handleInterrupt called back!    ## as expected, with no c-shared lib, the handleInterrupt() function is invoked.
 back out of BlockInSelect()! R_interrupts_pending = 1
 jaten@Jasons-MacBook-Pro:~/cshared$ ./with_mygolib 
 about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
@@ -48,12 +46,11 @@ mylib.go: in BlockInSelect(): about to select on ctrlC_Chan
 
   I see ctrl-c !!
 
-back out of BlockInSelect()! R_interrupts_pending = 0
+back out of BlockInSelect()! R_interrupts_pending = 0  ## what???? the handleInterrupt() function was never called!
 jaten@Jasons-MacBook-Pro:~/cshared$
 ~~~
 
-vs
-on fedora22 linux amd64
+The same thing happens on fedora22 linux amd64, go1.5.1.
 
 ~~~
 [jaten@buzz cshared]$ make
@@ -76,17 +73,19 @@ mylib.go: in BlockInSelect(): about to select on ctrlC_Chan
 
   I see ctrl-c !!
 
-back out of BlockInSelect()! R_interrupts_pending = 0
+back out of BlockInSelect()! R_interrupts_pending = 0   ## what??? 
 [jaten@buzz cshared]$ ./no_mygolib 
 about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
   C-c C-c
  handleInterrupt called back!
-back out of BlockInSelect()! R_interrupts_pending = 1
+back out of BlockInSelect()! R_interrupts_pending = 1   ## seems to work when no c-shared go lib present.
 [jaten@buzz cshared]$ 
 
 ~~~
 
-stack trace from the crash when running under R on OSX. Source code is here: https://github.com/glycerine/rmq
+### the originating (and more elaborate) problem: the panic stack trace
+
+Here is the stack trace from the crash when running under R on OSX. Source code is here: https://github.com/glycerine/rmq
 
 The above code is a minimal test case for this more elaborate issue found in context of running under R.
 
