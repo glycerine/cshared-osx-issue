@@ -1,16 +1,38 @@
 # cshared-osx-issue
 
-With go 1.5.1 and at tip, I'm seeing what looks like a bug when c-shared .so libraries that do signal.Notify(c, os.Interrupt) are loaded in a host program that handles SIGINT itself.
+With go 1.5.1 and at tip, I'm seeing what looks like a bug when c-shared .so libraries are used.
 
-Update: tried with tip *on OSX and linux*, go version devel +79a3b56 Thu Oct 22 21:19:43 2015 +0000 darwin/amd64, and I see the same thing.
+On linux: loading a cshared library disables the previously installed interrupt handler for SIGINT.
+
+~~~
+[jaten@buzz cshared-osx-issue]$ go version
+go version devel +79a3b56 Thu Oct 22 21:19:43 2015 +0000 linux/amd64
+[jaten@buzz cshared-osx-issue]$ make
+cd mygolib && make
+make[1]: Entering directory '/home/jaten/cshared-osx-issue/mygolib'
+go build -buildmode=c-shared -o ../libmygolib.so mygolib.go
+#nm -gU ../libmygolib.so
+make[1]: Leaving directory '/home/jaten/cshared-osx-issue/mygolib'
+gcc -DUSE_GOLIB=1 uses_mygolib.c -o with_mygolib libmygolib.so
+gcc -DUSE_GOLIB=0 uses_mygolib.c -o no_mygolib
+[jaten@buzz cshared-osx-issue]$ ./no_mygolib 
+about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
+  C-c C-c  # I press ctrl-c here
+ handleInterrupt called back!  # good, SIGINT handler works
+back out of BlockInSelect()! R_interrupts_pending = 1
+[jaten@buzz cshared-osx-issue]$ ./with_mygolib 
+about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
+  C-c C-c  # I press ctrl-c here. Bad, no SIGINT handler (the one installed by the C main() code) was run!
+  [jaten@buzz cshared-osx-issue]$
+~~~
 
 Possibly related: https://github.com/golang/go/issues/11794
 
 ###Discussion:
 
-When I am building a c-shared dynamic library with golang code, it looks
+When I build a c-shared dynamic library with golang code, it looks
 as though loading the shared library into the c-code masks the native signal
-handling on OSX.  And on linux.
+handling on OSX.  And on linux. Even when I eliminate the signal.Notify() usage, just linking with a cshared go library is enough to eliminate the previously registerd SIGINT handler.
 
 I was led to investigate because when I loaded
 a c-shared built .so library into the R statistical analysis 
@@ -18,83 +40,6 @@ environment, set-up handlers with signal.Notify(), and then pressed ctrl-c:
  it panics/crashes on OSX, but
 works fine on Linux. See the last stack dump in this repo for the full details of that panic.
 
-This repo is an attempt to reduce/isolate that issue into a minimal test case. I've not been successful yet in reproducing the difference between OSX and Linux, and I suspect this is due to variation in the signal handling code either in the Golang runtime or the R runtime.
-
-Nonethless, while I cannot reproduce the crash/panic in a minimal test case (it reproduces easily in you want to go to the trouble of doing an R source install and compiling my R library 'rmq'), I do observe that signal handling under OSX and linux appears to be disabled by loading the golang based c-shared library, and I strongly suspect that this is a part of the mechanism of the crash. Moreover it seems like a bug in its own right.
-
-I think this is related to https://github.com/golang/go/issues/11794.
-
-### details
-
-on darwin-amd64 / OSX 10.10.5 Yosemite:
-
-The places below where you see "C-c C-c" is where I give Ctrl-c to 
-the program. It shows up twice due to being inside an emacs buffer.
-
-~~~
-$ make  # generates ./with_mygolib
-$ make no_go_lib   # generates ./no_mygolib
-
-jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ make
-cd mygolib && make
-go build -buildmode=c-shared -o ../libmygolib.so mygolib.go
-#nm -gU ../libmygolib.so
-gcc -DUSE_GOLIB=1 uses_mygolib.c -o with_mygolib libmygolib.so
-jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ ./with_mygolib 
-about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
-mylib.go: in BlockInSelect(): about to select on ctrlC_Chan
-  C-c C-c
-
-  I see ctrl-c !!
-                           ## what?? why no handleInterrupts() call!??
-  C-c C-c
-
-  I see ctrl-c !!
-
-back out of BlockInSelect()! R_interrupts_pending = 0 
-jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ ./no_mygolib 
-about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
-  C-c C-c
- handleInterrupt called back!
-back out of BlockInSelect()! R_interrupts_pending = 1
-jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$   C-c C-c
-jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ go version
-go version devel +79a3b56 Thu Oct 22 21:19:43 2015 +0000 darwin/amd64
-jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ 
-~~~
-
-The same thing happens on fedora22 linux amd64, go1.5.1. And at tip 79a3b56.
-
-~~~
-[jaten@buzz cshared]$ make
-cd mygolib && make
-make[1]: Entering directory '/home/jaten/cshared/mygolib'
-go build -buildmode=c-shared -o ../libmygolib.so mygolib.go
-#nm -gU ../libmygolib.so
-make[1]: Leaving directory '/home/jaten/cshared/mygolib'
-gcc -DUSE_GOLIB=1 uses_mygolib.c -o with_mygolib libmygolib.so
-[jaten@buzz cshared]$ make no_go_lib
-gcc -DUSE_GOLIB=0 uses_mygolib.c -o no_mygolib
-[jaten@buzz cshared]$ ./with_mygolib 
-about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
-mylib.go: in BlockInSelect(): about to select on ctrlC_Chan
-  C-c C-c
-
-  I see ctrl-c !!
-
-  C-c C-c
-
-  I see ctrl-c !!
-
-back out of BlockInSelect()! R_interrupts_pending = 0   ## what??? 
-[jaten@buzz cshared]$ ./no_mygolib 
-about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
-  C-c C-c
- handleInterrupt called back!
-back out of BlockInSelect()! R_interrupts_pending = 1   ## seems to work when no c-shared go lib present.
-[jaten@buzz cshared]$ 
-
-~~~
 
 ### the originating (and more elaborate) problem: the panic stack trace
 
