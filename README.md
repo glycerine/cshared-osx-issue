@@ -2,7 +2,7 @@
 
 With go 1.5.1 and at tip, I'm seeing what looks like a bug when c-shared .so libraries that do signal.Notify(c, os.Interrupt) are loaded in a host program that handles SIGINT itself.
 
-Update: tried with tip *on OSX*, go version devel +79a3b56 Thu Oct 22 21:19:43 2015 +0000 darwin/amd64, and I see the same thing.
+Update: tried with tip *on OSX and linux*, go version devel +79a3b56 Thu Oct 22 21:19:43 2015 +0000 darwin/amd64, and I see the same thing.
 
 Possibly related: https://github.com/golang/go/issues/11794
 
@@ -63,7 +63,7 @@ go version devel +79a3b56 Thu Oct 22 21:19:43 2015 +0000 darwin/amd64
 jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ 
 ~~~
 
-The same thing happens on fedora22 linux amd64, go1.5.1.
+The same thing happens on fedora22 linux amd64, go1.5.1. And at tip 79a3b56.
 
 ~~~
 [jaten@buzz cshared]$ make
