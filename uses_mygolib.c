@@ -33,3 +33,24 @@ int main() {
   printf("back out of BlockInSelect()! R_interrupts_pending = %d\n", R_interrupts_pending);
   return 0;
 }
+
+/* LINUX:
+
+[jaten@buzz cshared-osx-issue]$ make
+cd mygolib && make
+make[1]: Entering directory '/home/jaten/cshared-osx-issue/mygolib'
+go build -buildmode=c-shared -o ../libmygolib.so mygolib.go
+#nm -gU ../libmygolib.so
+make[1]: Leaving directory '/home/jaten/cshared-osx-issue/mygolib'
+gcc -DUSE_GOLIB=1 uses_mygolib.c -o with_mygolib libmygolib.so
+gcc -DUSE_GOLIB=0 uses_mygolib.c -o no_mygolib
+[jaten@buzz cshared-osx-issue]$ ./no_mygolib 
+about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
+  C-c C-c
+ handleInterrupt called back!   # good, SIGINT working
+back out of BlockInSelect()! R_interrupts_pending = 1
+[jaten@buzz cshared-osx-issue]$ ./with_mygolib
+about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
+  C-c C-c[jaten@buzz cshared-osx-issue]$ # bad, SIGINT not working
+*/
+
