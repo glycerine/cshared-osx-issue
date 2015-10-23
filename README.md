@@ -4,7 +4,7 @@ With go 1.5.1, I'm seeing what looks like a bug.
 
 Possibly related: https://github.com/golang/go/issues/11794
 
-###Details:
+###Discussion:
 
 When I am building a c-shared dynamic library with golang code, it looks
 as though loading the shared library into the c-code masks the native signal
@@ -12,14 +12,17 @@ handling on OSX.  And on linux.
 
 I was led to investigate because when I loaded
 a c-shared built .so library into the R statistical analysis 
-environment, and then pressed ctrl-c: it panics/crashes on OSX, but
+environment, set-up handlers with signal.Notify(), and then pressed ctrl-c:
+ it panics/crashes on OSX, but
 works fine on Linux. See the last stack dump in this repo for the full details of that panic.
 
-This repo is an attempt to reduce/isolate that issue into a minimal test case.
+This repo is an attempt to reduce/isolate that issue into a minimal test case. I've not been successful yet in reproducing the difference between OSX and Linux, and I suspect this is due to variation in the signal handling code either in the Golang runtime or the R runtime.
 
-While I cannot reproduce the crash/panic (yet), I do observe that signal handling under OSX and linux appears to be disabled by loading the golang based c-shared library, and I strongly suspect that this is a part of the mechanism of the crash. And it seems like a bug in its own right.
+Nonethless, while I cannot reproduce the crash/panic in a minimal test case (it reproduces easily in you want to go to the trouble of doing an R source install and compiling my R library 'rmq'), I do observe that signal handling under OSX and linux appears to be disabled by loading the golang based c-shared library, and I strongly suspect that this is a part of the mechanism of the crash. Moreover it seems like a bug in its own right.
 
 I think this is related to https://github.com/golang/go/issues/11794.
+
+### details
 
 on darwin-amd64 / OSX 10.10.5 Yosemite:
 
