@@ -1,6 +1,8 @@
 # cshared-osx-issue
 
-With go 1.5.1 and at tip, I'm seeing what looks like a bug when c-shared .so libraries are used.
+Test case repro for https://github.com/golang/go/issues/13028
+
+With go 1.5.1 and at tip, I'm seeing what looks like a bug when c-shared built .so (i.e. golang source) libraries are used.
 
 On both linux and OSX: linking in a cshared library disables the previously installed interrupt handler for SIGINT.
 
@@ -76,7 +78,7 @@ I was led to investigate because when I loaded
 a c-shared built .so library into the R statistical analysis 
 environment, set-up handlers with signal.Notify(), and then pressed ctrl-c:
  it panics/crashes on OSX, but
-works fine on Linux. See the last stack dump in this repo for the full details of that panic.
+works fine on Linux. This next stack dump has the full details of that panic, which is OSX only.
 
 
 ### the originating (and more elaborate) problem: the panic stack trace
