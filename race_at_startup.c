@@ -22,8 +22,24 @@ int main() {
   // race condition here:
   // OSX: with this sleep in place, then the following signal() will take effect, overriding what the cshared library is doing. Without the sleep (sleep commented out), the cshared library reset of the SIGINT handler happens after the following signal() call.
   //sleep(1); 
-  signal(SIGINT,  handleInterrupt);
-  
+  sig_t prev;
+  sig_t cur;
+  prev = signal(SIGINT,  handleInterrupt);
+  printf("prev = %p\n", prev);
+  int count = 0;
+  while(1) {
+      cur = signal(SIGINT,  handleInterrupt);
+      if (cur != handleInterrupt) {
+          break;
+        }
+      count++;
+      if (count > 10000000) {
+        break;
+        }
+  }
+
+  printf("done with loop at count = %d\n", count); // getting 0
+
   printf("about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.\n");
 
   BlockInSelect();
