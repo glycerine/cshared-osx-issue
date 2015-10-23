@@ -1,6 +1,8 @@
 # cshared-osx-issue
 
-With go 1.5.1, I'm seeing what looks like a bug when c-shared .so libraries that do signal.Notify(c, os.Interrupt) are loaded in a host program that handles SIGINT itself.
+With go 1.5.1 and at tip, I'm seeing what looks like a bug when c-shared .so libraries that do signal.Notify(c, os.Interrupt) are loaded in a host program that handles SIGINT itself.
+
+Update: tried with tip, go version devel +79a3b56 Thu Oct 22 21:19:43 2015 +0000 darwin/amd64, and I see the same thing.
 
 Possibly related: https://github.com/golang/go/issues/11794
 
@@ -33,24 +35,32 @@ the program. It shows up twice due to being inside an emacs buffer.
 $ make  # generates ./with_mygolib
 $ make no_go_lib   # generates ./no_mygolib
 
-jaten@Jasons-MacBook-Pro:~/cshared$ ./no_mygolib 
-about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
-  C-c C-c
- handleInterrupt called back!    ## as expected, with no c-shared lib, the handleInterrupt() function is invoked.
-back out of BlockInSelect()! R_interrupts_pending = 1
-jaten@Jasons-MacBook-Pro:~/cshared$ ./with_mygolib 
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ make
+cd mygolib && make
+go build -buildmode=c-shared -o ../libmygolib.so mygolib.go
+#nm -gU ../libmygolib.so
+gcc -DUSE_GOLIB=1 uses_mygolib.c -o with_mygolib libmygolib.so
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ ./with_mygolib 
 about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
 mylib.go: in BlockInSelect(): about to select on ctrlC_Chan
   C-c C-c
 
   I see ctrl-c !!
-
+                           ## what?? why no handleInterrupts() call!??
   C-c C-c
 
   I see ctrl-c !!
 
-back out of BlockInSelect()! R_interrupts_pending = 0  ## what???? the handleInterrupt() function was never called!
-jaten@Jasons-MacBook-Pro:~/cshared$
+back out of BlockInSelect()! R_interrupts_pending = 0 
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ ./no_mygolib 
+about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
+  C-c C-c
+ handleInterrupt called back!
+back out of BlockInSelect()! R_interrupts_pending = 1
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$   C-c C-c
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ go version
+go version devel +79a3b56 Thu Oct 22 21:19:43 2015 +0000 darwin/amd64
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ 
 ~~~
 
 The same thing happens on fedora22 linux amd64, go1.5.1.
