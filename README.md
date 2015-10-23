@@ -1,6 +1,6 @@
 # cshared-osx-issue
 
-With go 1.5.1, I'm seeing what looks like a bug.
+With go 1.5.1, I'm seeing what looks like a bug when c-shared .so libraries that do signal.Notify(c, os.Interrupt) are loaded in a host program that handles SIGINT itself.
 
 Possibly related: https://github.com/golang/go/issues/11794
 
