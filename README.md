@@ -2,7 +2,7 @@
 
 With go 1.5.1 and at tip, I'm seeing what looks like a bug when c-shared .so libraries are used.
 
-On linux: loading a cshared library disables the previously installed interrupt handler for SIGINT.
+On both linux and OSX: linking in a cshared library disables the previously installed interrupt handler for SIGINT.
 
 ~~~
 [jaten@buzz cshared-osx-issue]$ go version
@@ -24,6 +24,44 @@ back out of BlockInSelect()! R_interrupts_pending = 1
 about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
   C-c C-c  # I press ctrl-c here. Bad, no SIGINT handler (the one installed by the C main() code) was run!
   [jaten@buzz cshared-osx-issue]$
+~~~
+
+on osx yosemite 10.10.5
+
+~~~
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ make
+cd mygolib && make
+go build -buildmode=c-shared -o ../libmygolib.so mygolib.go
+#nm -gU ../libmygolib.so
+gcc -DUSE_GOLIB=1 uses_mygolib.c -o with_mygolib libmygolib.so
+gcc -DUSE_GOLIB=0 uses_mygolib.c -o no_mygolib
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ ./no_mygolib 
+about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
+  C-c C-c
+ handleInterrupt called back!
+back out of BlockInSelect()! R_interrupts_pending = 1
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ ./with_mygolib 
+about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
+  C-c C-cjaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ go version
+go version go1.5.1 darwin/amd64
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ . ~/.bashrc
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ go version
+go version devel +79a3b56 Thu Oct 22 21:19:43 2015 +0000 darwin/amd64
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ make
+cd mygolib && make
+go build -buildmode=c-shared -o ../libmygolib.so mygolib.go
+#nm -gU ../libmygolib.so
+gcc -DUSE_GOLIB=1 uses_mygolib.c -o with_mygolib libmygolib.so
+gcc -DUSE_GOLIB=0 uses_mygolib.c -o no_mygolib
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ ./with_mygolib 
+about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
+  C-c C-cjaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ ./no_mygolib 
+about to call BlockInSelect(), which will exit after receiving 2 ctrl-c SIGINT signals.
+  C-c C-c
+ handleInterrupt called back!
+back out of BlockInSelect()! R_interrupts_pending = 1
+jaten@Jasons-MacBook-Pro:~/cshared-osx-issue$ 
+
 ~~~
 
 Possibly related: https://github.com/golang/go/issues/11794
